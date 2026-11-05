@@ -17,3 +17,10 @@ dist/
 build/
 __pycache__/
 *.log
+
+# Python / local data
+.venv/
+*.pyc
+.pytest_cache/
+*.db
+*.db-journal

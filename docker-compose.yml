@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: voidgrid
+      POSTGRES_PASSWORD: voidgrid
+      POSTGRES_DB: voidgrid
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voidgrid"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build: .
+    environment:
+      VOIDGRID_DATABASE_URL: postgresql+psycopg://voidgrid:voidgrid@db:5432/voidgrid
+      VOIDGRID_WEB_BASE_URL: http://localhost:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
