@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>{{BRAND}}</title>
+<style>
+:root {
+  --bg: #17130f; --panel: #221c16; --panel-2: #2b231c; --line: #3a2f25;
+  --ink: #f3e9dc; --muted: #b5a48f; --faint: #85766529;
+  --accent: #e0a458; --accent-ink: #1d1814;
+  --wren: #c9a27e; --theo: #7fb3d5; --jules: #e58e73; --pip: #9fd18b; --human: #e0a458;
+  --good: #9fd18b; --bar: #e0a458;
+  --radius: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6efe5; --panel: #fffaf3; --panel-2: #f3e9db; --line: #e3d5c2;
+    --ink: #2b2118; --muted: #6f5d4b; --faint: #6f5d4b1f;
+    --accent: #a8641b; --accent-ink: #fffaf3;
+    --wren: #8a6440; --theo: #2f6f9a; --jules: #b4553a; --pip: #4c8a3a; --human: #a8641b;
+    --good: #4c8a3a; --bar: #a8641b;
+    color-scheme: light;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); }
+button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); padding: 7px 12px; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: progress; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.on { border-color: var(--accent); color: var(--accent); }
+
+header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header h1 { font: 600 20px/1 Georgia, serif; margin: 0; letter-spacing: .3px; }
+header .setting { color: var(--muted); font-style: italic; font-family: Georgia, serif; }
+header .spacer { flex: 1; }
+.pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.pill.live::before { content: "● "; color: var(--good); }
+
+main { display: grid; grid-template-columns: 270px minmax(0, 1fr) 390px; gap: 16px; padding: 16px 20px; height: calc(100% - 58px); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-height: 0; display: flex; flex-direction: column; }
+.panel > h2 { font: 600 12px/1 system-ui, sans-serif; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 0; padding: 14px 16px 10px; display: flex; gap: 8px; align-items: center; }
+.panel .body { padding: 0 16px 16px; overflow-y: auto; min-height: 0; }
+
+/* Forecast */
+.tag-placeholder { font-size: 10px; letter-spacing: .5px; border: 1px dashed var(--muted); border-radius: 6px; padding: 1px 6px; text-transform: none; }
+.forecast-call { background: var(--panel-2); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+.forecast-call .big { font: 600 22px/1.2 Georgia, serif; }
+.forecast-call .sub { color: var(--muted); font-size: 13px; }
+.spark { width: 100%; height: 46px; margin-top: 8px; }
+.metric { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.metric span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bars { margin-top: 14px; }
+.bars h3, .forecast h3 { font-size: 12px; color: var(--muted); font-weight: 600; margin: 16px 0 6px; }
+.barrow { display: grid; grid-template-columns: 96px 1fr 34px; gap: 8px; align-items: center; font-size: 12px; margin: 5px 0; }
+.barrow .track { height: 6px; background: var(--faint); border-radius: 3px; overflow: hidden; }
+.barrow .fill { height: 100%; background: var(--bar); border-radius: 3px; }
+.barrow .neg { background: var(--jules); }
+.barrow span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.note { color: var(--muted); font-size: 12px; margin-top: 12px; }
+
+/* Discovery */
+.find { overflow-y: auto; }
+.find .hero { width: 100%; aspect-ratio: 16 / 8; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; display: block; background: var(--panel-2); }
+.find .hero.empty { display: grid; place-items: center; font: italic 18px Georgia, serif; color: var(--muted); }
+.find .content { padding: 18px 24px 24px; }
+.kicker { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13px; }
+.chip { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; border-radius: 6px; padding: 2px 7px; background: var(--panel-2); color: var(--muted); }
+.chip.kind { color: var(--accent); }
+.find h2.title { font: 600 30px/1.2 Georgia, serif; margin: 10px 0 12px; text-wrap: balance; }
+.find h2.title a { color: var(--ink); text-decoration: none; }
+.find h2.title a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.find .summary { font: 17px/1.6 Georgia, serif; margin: 0 0 16px; max-width: 70ch; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 18px 0 8px; }
+.actions .spacer { flex: 1; }
+.attrib { color: var(--muted); font-size: 12px; margin-top: 14px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tags span { font-size: 12px; color: var(--muted); }
+.tags span::before { content: "#"; }
+
+/* Gallery */
+.gallery { display: flex; flex-direction: column; }
+.feed { flex: 1; overflow-y: auto; padding: 0 14px 10px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.line { display: grid; grid-template-columns: 30px 1fr; gap: 9px; animation: in .25s ease-out both; }
+@keyframes in { from { opacity: 0; transform: translateY(4px); } }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 Georgia, serif; color: var(--accent-ink); background: var(--c, var(--muted)); }
+.who { font-size: 12px; color: var(--muted); margin-bottom: 2px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.who b { color: var(--c, var(--ink)); font-weight: 600; }
+.bubble { background: var(--panel-2); border-radius: 4px 12px 12px 12px; padding: 8px 11px; }
+.line.human { grid-template-columns: 1fr 30px; }
+.line.human .avatar { order: 2; }
+.line.human .bubble { border-radius: 12px 4px 12px 12px; background: color-mix(in srgb, var(--human) 18%, var(--panel)); }
+.line.human .who { justify-content: flex-end; }
+.beat { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; border-radius: 5px; padding: 1px 5px; border: 1px solid currentColor; }
+.receipt { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.receipt blockquote { margin: 0 0 4px; padding: 4px 0 4px 9px; border-left: 2px solid var(--line); font-style: italic; }
+.divider { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.typing { color: var(--muted); font-size: 13px; font-style: italic; padding: 0 14px 8px; min-height: 22px; }
+form.say { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+form.say input { flex: 1; min-width: 0; font: inherit; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+form.say input:focus { outline: none; border-color: var(--accent); }
+.gallery-tools { display: flex; gap: 6px; padding: 0 14px 8px; }
+.gallery-tools button { font-size: 12px; padding: 4px 9px; }
+.err { color: var(--jules); font-size: 13px; padding: 0 14px 6px; }
+.catchup { background: var(--panel-2); border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+.catchup ul { margin: 4px 0 0; padding-left: 18px; }
+
+@media (max-width: 1100px) {
+  main { grid-template-columns: 1fr 360px; height: auto; }
+  .forecast { grid-column: 1 / -1; order: 3; }
+}
+@media (max-width: 760px) {
+  header { padding: 10px 16px; }
+  main { grid-template-columns: 1fr; padding: 12px 16px; }
+  .gallery { height: 75vh; }
+  .find h2.title { font-size: 24px; }
+  .find .content { padding: 14px 16px 18px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>{{BRAND}}</h1>
+  <span class="setting" id="setting"></span>
+  <span class="spacer"></span>
+  <span class="pill" id="voices"></span>
+  <span class="pill" id="scout-status">Scout idle</span>
+  <button id="scout-btn" title="Read the feeds for new finds">Scout for finds</button>
+</header>
+
+<main>
+  <section class="panel forecast" aria-label="Forecast">
+    <h2>Forecast <span class="tag-placeholder">placeholder</span></h2>
+    <div class="body" id="forecast"></div>
+  </section>
+
+  <section class="panel find" aria-label="Tonight's find" id="find"></section>
+
+  <section class="panel gallery" aria-label="Peanut gallery">
+    <h2>Peanut gallery</h2>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="typing" id="typing"></div>
+    <div class="err" id="err" hidden></div>
+    <div class="gallery-tools">
+      <button id="listen-btn">Keep listening</button>
+    </div>
+    <form class="say" id="say-form" autocomplete="off">
+      <input id="say-input" maxlength="1000" placeholder="Say something to the room…" aria-label="Say something">
+      <button class="primary" type="submit">Say</button>
+    </form>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const COLORS = { wren: "--wren", theo: "--theo", jules: "--jules", pip: "--pip" };
+const ROLES = { wren: "host", theo: "expert", jules: "comedian", pip: "fan" };
+const BEATS = { fact: "real fact", crowd: "what people say", joke: "joke" };
+let state = { discovery: null, busy: false };
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function safeUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u) ? u : null; }
+function link(u, text) {
+  const s = safeUrl(u);
+  return s ? `<a href="${esc(s)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>` : esc(text);
+}
+function ago(iso) {
+  if (!iso) return null;
+  const h = (Date.now() - new Date(iso + (iso.endsWith("Z") ? "" : "Z")).getTime()) / 36e5;
+  if (h < 1) return "just now";
+  if (h < 48) return `${Math.round(h)}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+async function api(path, body) {
+  const isPost = body !== undefined;
+  const res = await fetch(path, isPost ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function setBusy(on, msg) {
+  state.busy = on;
+  $("typing").textContent = on ? (msg || "The regulars are thinking…") : "";
+  document.querySelectorAll("button, #say-input").forEach((b) => { if (b.id !== "scout-btn") b.disabled = on; });
+}
+function showErr(e) {
+  const el = $("err");
+  el.hidden = !e;
+  el.textContent = e ? String(e.message || e) : "";
+}
+
+// ---------------------------------------------------------------- discovery
+function renderFind(d) {
+  state.discovery = d;
+  const el = $("find");
+  if (!d) {
+    el.innerHTML = `<div class="hero empty">A quiet night</div><div class="content"><h2 class="title">Nothing new on the table</h2>
+      <p class="summary">The regulars are just catching up. Try the scout for fresh finds, or keep listening.</p>
+      <div class="actions"><button class="primary" id="next-btn">Try another find</button></div></div>`;
+    $("next-btn").onclick = nextFind;
+    renderForecast(null);
+    return;
+  }
+  const img = safeUrl(d.image_url);
+  const when = ago(d.published_at);
+  const by = d.creator || (d.source && d.source.key) || "";
+  el.innerHTML = `
+    ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer">`
+          : `<div class="hero empty">${esc(d.kind === "video" ? "A film" : d.kind === "podcast" ? "A podcast episode" : "Tonight's find")}</div>`}
+    <div class="content">
+      <div class="kicker">
+        <span class="chip kind">${esc(d.kind)}</span>
+        ${d.is_fixture ? `<span class="chip">sample content</span>` : ""}
+        ${by ? `<span>${esc(by)}</span>` : ""}
+        ${when ? `<span>· ${esc(when)}</span>` : ""}
+      </div>
+      <h2 class="title">${link(d.url, d.title)}</h2>
+      <p class="summary">${esc(d.summary)}</p>
+      <div class="tags">${(d.tags || []).map((t) => `<span>${esc(t)}</span>`).join("")}</div>
+      <div class="actions">
+        <button data-r="loved">♥ Loved it</button>
+        <button data-r="liked">Liked it</button>
+        <button data-r="meh">Meh</button>
+        <span class="spacer"></span>
+        ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer"><button tabindex="-1">Open ↗</button></a>` : ""}
+        <button class="primary" id="next-btn">Next find →</button>
+      </div>
+      <div class="attrib">${esc(d.source?.attribution || "")} ${d.what_we_accessed ? `· The regulars have only the ${esc(d.what_we_accessed.replace(/_/g, " "))}.` : ""}</div>
+    </div>`;
+  const hero = el.querySelector("img.hero");
+  if (hero) hero.addEventListener("error", () => { hero.replaceWith(Object.assign(document.createElement("div"), { className: "hero empty", textContent: "Tonight's find" })); });
+  el.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => react(b.dataset.r, b)));
+  $("next-btn").onclick = nextFind;
+  renderForecast(d);
+}
+
+// ---------------------------------------------------------------- forecast (placeholder)
+function renderForecast(d) {
+  const el = $("forecast");
+  if (!d) { el.innerHTML = `<p class="note">No find on the table.</p>`; return; }
+  const s = d.signals || {};
+  const b = s.breakdown || null;
+  const pph = s.hn_points_per_hour;
+  let call, sub;
+  if (pph == null) { call = "Under the radar"; sub = "No Hacker News thread for this link yet."; }
+  else if (pph >= 10) { call = "Breaking out"; sub = `${pph} points an hour on Hacker News.`; }
+  else if (pph >= 3) { call = "Gaining steam"; sub = `${pph} points an hour on Hacker News.`; }
+  else if (pph >= 0.5) { call = "Simmering"; sub = `${pph} points an hour on Hacker News.`; }
+  else { call = "Quiet"; sub = `${pph} points an hour on Hacker News.`; }
+
+  const metric = (k, v) => v == null ? "" : `<div class="metric"><span>${esc(k)}</span><span>${esc(v)}</span></div>`;
+  const bar = (label, v, neg) => v == null ? "" : `<div class="barrow"><span>${esc(label)}</span>
+      <div class="track"><div class="fill ${neg ? "neg" : ""}" style="width:${Math.max(0, Math.min(100, v))}%"></div></div><span>${neg ? "−" : ""}${Math.round(v)}</span></div>`;
+  el.innerHTML = `
+    <div class="forecast-call">
+      <div class="sub">Will this catch on?</div>
+      <div class="big">${esc(call)}</div>
+      <div class="sub">${esc(sub)}</div>
+      ${sparkline(s)}
+    </div>
+    ${metric("Diamond score", d.score != null ? Math.round(d.score) + " / 100" : null)}
+    ${metric("HN points", s.hn_points)}
+    ${metric("HN comments", s.hn_comments)}
+    ${metric("Points / hour", pph)}
+    ${metric("Published", ago(d.published_at))}
+    ${b ? `<div class="bars"><h3>Why the scout picked it${b.judged_by ? ` (judged by ${esc(b.judged_by)})` : ""}</h3>
+      ${bar("Quality", b.quality)}${bar("Interesting", b.interestingness)}${bar("Rarity", b.rarity)}
+      ${bar("Originality", b.originality)}${bar("Outlier bonus", b.outlier_bonus * 100 / 30)}${b.clickbait_penalty ? bar("Clickbait", b.clickbait_penalty * 2, true) : ""}</div>`
+      : `<p class="note">${d.is_fixture ? "Sample content: the scout didn't score this one." : "No score breakdown."}</p>`}
+    <p class="note">Placeholder: a real forecast will predict where this goes next. For now it reads the current buzz and the scout's diamond score (ported from oneitem).</p>`;
+}
+function sparkline(s) {
+  // Placeholder shape only: momentum implied by points/hour, not real history.
+  const pph = s.hn_points_per_hour;
+  const k = pph == null ? 0.05 : Math.min(1, pph / 12);
+  const pts = Array.from({ length: 12 }, (_, i) => {
+    const x = (i / 11) * 100, y = 40 - (Math.pow(i / 11, 1.6) * k * 34) - 3;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="spark" viewBox="0 0 100 44" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+// ---------------------------------------------------------------- gallery
+function lineHtml(l) {
+  const human = l.speaker_type !== "bot";
+  const key = l.speaker_key || "";
+  const color = human ? "--human" : (COLORS[key] || "--muted");
+  const m = l.meta || {};
+  let receipt = "";
+  if (m.beat === "fact") receipt = `<div class="receipt">Source: ${link(m.url, `${m.source || "Wikipedia"} — ${m.about || ""}`)} ↗</div>`;
+  if (m.beat === "crowd") {
+    const quoted = m.quote && l.text.includes(m.quote.slice(0, 60));
+    receipt = `<div class="receipt">${quoted ? "" : `<blockquote>${esc(m.quote)}</blockquote>`}${link(m.url, m.thread_title ? `${m.source} thread: “${m.thread_title}”` : `Thread on ${m.source || "the web"}`)} ↗</div>`;
+  }
+  const role = human ? (l.speaker_type === "human_vip" ? "guest" : "you") : `AI ${ROLES[key] || "regular"}`;
+  return `<div class="line ${human ? "human" : ""}" style="--c: var(${color})">
+    <div class="avatar">${esc((l.speaker || "?")[0])}</div>
+    <div><div class="who"><b>${esc(l.speaker)}</b><span>${esc(role)}</span>${m.beat ? `<span class="beat">${esc(BEATS[m.beat] || m.beat)}</span>` : ""}</div>
+    <div class="bubble">${esc(l.text)}</div>${receipt}</div></div>`;
+}
+function addLines(lines, divider) {
+  const feed = $("feed");
+  if (divider) feed.insertAdjacentHTML("beforeend", `<div class="divider">${esc(divider)}</div>`);
+  for (const l of lines || []) feed.insertAdjacentHTML("beforeend", lineHtml(l));
+  feed.scrollTop = feed.scrollHeight;
+}
+function addCatchup(items) {
+  if (!items || !items.length) return;
+  $("feed").insertAdjacentHTML("beforeend",
+    `<div class="catchup"><b>While you were away</b><ul>${items.map((i) => `<li>${esc(i.text)}</li>`).join("")}</ul></div>`);
+}
+function applyPlace(p) {
+  if (p) $("setting").textContent = p.setting ? `— ${p.setting}` : "";
+}
+
+// ---------------------------------------------------------------- actions
+async function act(fn, msg) {
+  if (state.busy) return;
+  showErr(null);
+  setBusy(true, msg);
+  try { await fn(); } catch (e) { showErr(e); } finally { setBusy(false); }
+}
+function nextFind() {
+  return act(async () => {
+    const r = await api("/api/next", {});
+    if (r.discovery) { renderFind(r.discovery); addLines(r.conversation, r.discovery.title); }
+    else { addLines([], r.narration_note || "That's everything for now"); renderFind(null); }
+  }, "Finding something new and looking it up…");
+}
+function react(reaction, btn) {
+  return act(async () => {
+    const r = await api("/api/react", { reaction });
+    document.querySelectorAll("[data-r]").forEach((b) => b.classList.toggle("on", b === btn));
+    addLines(r.conversation);
+  }, "Noted…");
+}
+$("listen-btn").onclick = () => act(async () => addLines((await api("/api/listen", {})).conversation), "Listening…");
+$("say-form").onsubmit = (ev) => {
+  ev.preventDefault();
+  const text = $("say-input").value.trim();
+  if (!text) return;
+  act(async () => {
+    const r = await api("/api/say", { text });
+    $("say-input").value = "";
+    addLines(r.conversation);
+  }, "The room is listening…");
+};
+
+// ---------------------------------------------------------------- scout
+async function pollScout(force) {
+  try {
+    const s = await api("/api/scout");
+    $("scout-status").textContent = s.message;
+    $("scout-status").classList.toggle("live", s.running);
+    $("scout-btn").disabled = s.running;
+    if (s.running || force) setTimeout(() => pollScout(false), 1500);
+  } catch (e) { /* ignore */ }
+}
+$("scout-btn").onclick = async () => {
+  try { await api("/api/scout", {}); } catch (e) { showErr(e); }
+  pollScout(true);
+};
+
+// ---------------------------------------------------------------- start
+(async function start() {
+  try {
+    const cur = await api("/api/current");
+    const v = cur.settings || {};
+    $("voices").textContent = v.voices === "anthropic" ? "Voices: Claude" : "Voices: scripted";
+    if (!v.scout) { $("scout-btn").hidden = true; $("scout-status").hidden = true; }
+    applyPlace(cur.place);
+    if (cur.scout && cur.scout.running) pollScout(true); else if (cur.scout) $("scout-status").textContent = cur.scout.message;
+    if (cur.you_are_here && cur.discovery) {
+      renderFind(cur.discovery);
+      addLines(cur.conversation);
+      return;
+    }
+    await act(async () => {
+      const r = await api("/api/enter", {});
+      applyPlace(r.place);
+      renderFind(r.discovery);
+      addCatchup(r.catch_up);
+      addLines(r.conversation);
+    }, "Walking in…");
+  } catch (e) { showErr(e); }
+})();
+</script>
+</body>
+</html>

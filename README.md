@@ -25,6 +25,37 @@ The demo runs the spec §12 walkthrough end to end: first visit, the sister's as
 uv run --group dev pytest
 ```
 
+## The web UI (fastest way to iterate)
+
+```bash
+uv run voidgrid-ui     # http://127.0.0.1:8010
+```
+
+Three panels: the **find** in the middle, a **forecast** on the left (a placeholder for now, showing current buzz and the scout's score breakdown), and the **peanut gallery** on the right, where you can talk to the room. On first start the scout reads its feeds in the background (about 30 seconds); press **Next find** to see what it found.
+
+The UI runs the same lounge as the MCP server (same database, same `VOIDGRID_USER_HANDLE`). It's **local only**: there's no login, so it binds to 127.0.0.1, rejects other Host headers, and only accepts JSON posts. Don't expose it; `voidgrid-web` is the one meant for the internet.
+
+### Where finds come from: the scout (ported from project oneitem)
+
+[scout.py](src/voidgrid/scout.py) is oneitem's pipeline:
+
+- **Sources:** its hand-picked list of expert publications, films and podcasts, at most 3 new items per feed per run, skipping grim items and anything older than 30 days.
+- **Buzz (the trend signal):** Hacker News points, comments and points per hour for the item's own link. oneitem used YouTube views against the channel's subscriber count, which needs an API key; feeds have no view counts.
+- **Diamond score:** oneitem's formula, `0.45·quality + 0.25·interestingness + 0.20·rarity + 0.10·originality + outlier bonus (up to 30 for a fast riser in its first 14 days) − 0.5·clickbait`, with anything under 50 trust rejected. With `VOIDGRID_LLM_PROVIDER=anthropic`, Claude judges quality, interest, originality, clickbait and trust. Offline, a simple heuristic does.
+- **Rotation:** after an article, a near-equal film or podcast wins.
+
+### What the gallery reacts with: briefings
+
+For each find, [briefing.py](src/voidgrid/briefing.py) gathers real material, and each regular has a job:
+
+| Regular | Beat | From |
+|---|---|---|
+| Theo | a real fact | Wikipedia, with a link to the page |
+| Pip | what people are saying | Hacker News comments on this exact link; failing that, a well-discussed HN thread about the find's named subject (labelled as such) |
+| Jules | a joke | Jules's own (needs Claude voices to be actually funny) |
+
+Every line that uses outside material shows its receipt (source link) in the UI. Third-party text is fenced as data in the prompts. A wrong fact is worse than none, so a Wikipedia page or HN thread only counts if it shares real words with the find. When nothing is relevant, that beat is skipped.
+
 ## Connect it to Claude Desktop (or any MCP client)
 
 Each person runs their own server process; identity comes from `VOIDGRID_USER_HANDLE`, never from tool arguments. Add to `claude_desktop_config.json`:
@@ -96,12 +127,18 @@ VOIDGRID_DATABASE_URL=postgresql+psycopg://voidgrid:voidgrid@localhost:5432/void
 | `src/voidgrid/llm.py` | Scripted and Claude providers |
 | `src/voidgrid/mcp_server.py` | 24 MCP tools |
 | `src/voidgrid/web.py` | The VIP link page |
+| `src/voidgrid/ui.py`, `static/ui.html` | The owner's web UI |
+| `src/voidgrid/scout.py` | Feeds, buzz, diamond score (oneitem port) |
+| `src/voidgrid/briefing.py` | Real commentary and facts for the gallery |
 | `migrations/` | Alembic migrations |
 
 ## Known limitations (v1)
 
 - **Not yet tried with real Claude voices.** The Claude provider's request shape is tested against the SDK, but no live conversation has been run. Voice quality and per-visit cost are unmeasured.
 - **Scripted mode is a placeholder voice.** It's fine for tests and offline use, but repetitive over many visits.
+- **Commentary coverage is thin.** Most fresh niche articles haven't been posted to Hacker News yet, so Pip's beat is often skipped. Bluesky and Reddit search both refuse unauthenticated requests (checked 2026-11-06); adding them needs app credentials.
+- **Fact matching is word overlap**, unless Claude is on (then Claude suggests the Wikipedia articles). Offline it can land on a related-but-tangential page (a fact about Berkeley for a story set there).
+- **Offline scoring is a heuristic.** Without Claude, the diamond score mostly reflects buzz and freshness, not quality.
 - **Fact extraction is rule-based** ("my name is…", "I love…"). It misses things said less directly.
 - **Taste tags and the grim-content filter are keyword lists**, not classifiers.
 - **Identity is per-process** (`VOIDGRID_USER_HANDLE`). There's no login, so a hosted multi-user deployment needs MCP auth first.

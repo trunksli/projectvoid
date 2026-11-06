@@ -39,6 +39,16 @@ class Settings(BaseSettings):
 
     # Real, rights-cleared source (spec §3.15 freshness floor). Off by default so tests stay offline.
     enable_wikipedia_source: bool = False
+
+    # The scout (ported from project oneitem): curated feeds + Hacker News buzz + the diamond score.
+    enable_scout: bool = False
+    scout_llm_scoring: bool = True  # with llm_provider=anthropic, Claude judges quality/clickbait/trust
+    # Briefings: real commentary (Hacker News) and a real fact (Wikipedia) for each find, for the gallery.
+    enable_briefings: bool = False
+
+    # The owner's web UI (voidgrid-ui). Local only: there is no login.
+    ui_host: str = "127.0.0.1"
+    ui_port: int = 8010
     contact_url: str = "https://github.com/trunksli/projectvoid"
 
 

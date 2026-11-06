@@ -26,6 +26,7 @@ dev = ["pytest>=8"]
 voidgrid-mcp = "voidgrid.mcp_server:main"
 voidgrid-web = "voidgrid.web:main"
 voidgrid-demo = "voidgrid.demo:main"
+voidgrid-ui = "voidgrid.ui:main"
 
 [build-system]
 requires = ["hatchling"]

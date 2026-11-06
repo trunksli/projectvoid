@@ -25,7 +25,8 @@ log = logging.getLogger(__name__)
 # A keyword list is a blunt first pass, not a content classifier (see README, known limitations).
 GRIM = re.compile(
     r"\b(kill(ed|ing|s)?|dies|died|death|dead|murder\w*|assassinat\w*|massacre\w*|genocide|terror\w*|bomb\w*|"
-    r"shoot\w*|crash(ed|es)?|war|wars|attack\w*|execut(ed|ion)|suicide|disaster|famine|earthquake|tsunami|abuse\w*)\b",
+    r"shoot\w*|crash(ed|es)?|war|wars|attack\w*|execut(ed|ion)|suicide|disaster|famine|earthquake|tsunami|abuse\w*|"
+    r"holocaust|concentration camps?|torture\w*|slaughter\w*|atrocit\w*)\b",
     re.I,
 )
 
@@ -189,8 +190,12 @@ class ContentService:
         self.memory = memory
         self.now = now
 
-    def pick_fresh(self, user: User, seed: int = 0) -> tuple[Discovery | None, str | None]:
-        """Return (discovery, fulfilled_promise_tag). Never repeats a discovery for the same person."""
+    def pick_fresh(self, user: User, seed: int = 0, *, last_kind: str | None = None) -> tuple[Discovery | None, str | None]:
+        """Return (discovery, fulfilled_promise_tag). Never repeats a discovery for the same person.
+
+        Taste and promises first; then the scout's diamond score, freshness, and oneitem's medium rotation
+        (after an article, a near-equal film or podcast wins).
+        """
         seen = select(SeenDiscovery.discovery_id).where(SeenDiscovery.user_id == user.id)
         candidates = list(
             self.s.scalars(
@@ -215,6 +220,12 @@ class ContentService:
                 sc += 2.0
             if not d.is_fixture:
                 sc += 0.3  # prefer real, current content when we have it
+            if d.score is not None:
+                sc += max(-1.0, min(1.0, (d.score - 60) / 40))  # the diamond score
+            if d.published_at is not None and (self.now() - d.published_at).days <= 3:
+                sc += 0.2
+            if last_kind and d.kind == last_kind:
+                sc -= 0.4  # medium rotation, among near-ties only
             return sc, hit
 
         scored = [(score(d), d) for d in candidates]
@@ -240,4 +251,10 @@ class ContentService:
             "what_we_accessed": d.analysis_depth,
             "is_fixture": d.is_fixture,
             "source": {"key": d.source_key, "license": r.license, "attribution": r.attribution},
+            "creator": d.creator,
+            "image_url": d.image_url,
+            "published_at": d.published_at.isoformat() if d.published_at else None,
+            "score": d.score,
+            "signals": d.signals or {},
+            "briefing": {k: (d.briefing or {}).get(k, []) for k in ("commentary", "facts")} if d.briefing is not None else None,
         }

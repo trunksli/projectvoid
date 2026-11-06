@@ -153,6 +153,7 @@ def narrate(lines: list[Utterance], *, viewer: str = "owner") -> str:
 
 def line_dicts(lines: list[Utterance], *, viewer: str = "owner") -> list[dict]:
     return [
-        {"speaker": u.speaker_name, "speaker_type": u.speaker_type, "label": speaker_label(u, viewer=viewer), "text": u.text}
+        {"speaker": u.speaker_name, "speaker_key": u.speaker_key, "speaker_type": u.speaker_type,
+         "label": speaker_label(u, viewer=viewer), "text": u.text, "meta": u.meta or None}
         for u in lines
     ]

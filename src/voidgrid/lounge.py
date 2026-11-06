@@ -30,6 +30,7 @@ from .models import (
     Decoration,
     Discovery,
     Event,
+    Exchange,
     Knock,
     Lounge,
     Note,
@@ -205,7 +206,7 @@ class LoungeService:
             c.s.add(Presence(lounge_id=lounge.id, user_id=user.id, role="owner", display_name=user.handle, joined_at=now, last_active_at=now))
             emit(c.s, EventType.VISIT_STARTED, actor_type="human_owner", actor_id=user.handle, lounge_id=lounge.id, at=now)
 
-            discovery, promise_tag = c.content.pick_fresh(user, seed=_seed(user.id, now.isoformat()))
+            discovery, promise_tag = c.content.pick_fresh(user, seed=_seed(user.id, now.isoformat()), last_kind=self._last_kind(c, lounge))
             promise_agent = None
             if promise_tag:
                 for p in c.memory.open_promises(user):
@@ -215,6 +216,7 @@ class LoungeService:
                         break
             if discovery:
                 c.content.mark_seen(user, discovery)
+                c.ensure_briefing(discovery)
                 lounge.current_discovery_id = discovery.id
                 emit(c.s, EventType.DISCOVERY_SHOWN, actor_type="system", actor_id="curator", lounge_id=lounge.id, payload={"discovery_id": discovery.id}, at=now)
             else:
@@ -279,10 +281,67 @@ class LoungeService:
             d = c.s.get(Discovery, lounge.current_discovery_id) if lounge.current_discovery_id else None
             recent = list(reversed(c.s.scalars(
                 select(Utterance).where(Utterance.lounge_id == lounge.id).order_by(Utterance.id.desc()).limit(4)).all()))
+            c.ensure_briefing(d)
             plan = self._plan(c, user, lounge, "listen" if d else "listen_empty", d, context=recent,
-                              max_commentator_turns=2 if lounge.mode == "quiet" else 3)
+                              max_commentator_turns=2 if lounge.mode == "quiet" else 3, beats_done=self._beats_done(c, lounge, d))
             lines = c.gallery.run(plan)
             return self._result(c, user, lounge, lines)
+
+    @staticmethod
+    def _last_kind(c: Ctx, lounge: Lounge) -> str | None:
+        d = c.s.get(Discovery, lounge.current_discovery_id) if lounge.current_discovery_id else None
+        return d.kind if d else None
+
+    @staticmethod
+    def _beats_done(c: Ctx, lounge: Lounge, d: Discovery | None) -> set[str]:
+        if d is None:
+            return set()
+        rows = c.s.scalars(
+            select(Utterance).join(Exchange, Exchange.id == Utterance.exchange_id)
+            .where(Utterance.lounge_id == lounge.id, Exchange.discovery_id == d.id, Utterance.meta.is_not(None))
+        )
+        return {u.speaker_key for u in rows if (u.meta or {}).get("beat")}
+
+    def next_find(self, handle: str) -> dict:
+        """Put a different find on the table; the regulars react to it (no greeting, you're already here)."""
+        with self.app.ctx() as c:
+            user, lounge = self._start(c, handle)
+            self._require_present(c, user, lounge)
+            now = c.now()
+            d, promise_tag = c.content.pick_fresh(user, seed=_seed(user.id, "next", now.isoformat()), last_kind=self._last_kind(c, lounge))
+            if d is None:
+                lounge.current_discovery_id = None
+                return self._result(c, user, lounge, [], extra={"narration_note": "That's everything for now. The scout will turn up more."})
+            promise_agent = None
+            if promise_tag:
+                for p in c.memory.open_promises(user):
+                    if p.content == promise_tag:
+                        p.fulfilled_at = now
+                        promise_agent = p.agent_key
+                        break
+            c.content.mark_seen(user, d)
+            c.ensure_briefing(d)
+            lounge.current_discovery_id = d.id
+            emit(c.s, EventType.DISCOVERY_SHOWN, actor_type="system", actor_id="curator", lounge_id=lounge.id, payload={"discovery_id": d.id}, at=now)
+            plan = self._plan(c, user, lounge, "next", d, promise_tag=promise_tag if promise_agent else None, promise_agent=promise_agent,
+                              max_commentator_turns=self._commentator_turns(lounge))
+            lines = c.gallery.run(plan)
+            return self._result(c, user, lounge, lines, discovery=d)
+
+    def current(self, handle: str) -> dict:
+        """The find on the table and the recent conversation, without anyone speaking (for the web UI)."""
+        with self.app.ctx() as c:
+            user, lounge = self._start(c, handle)
+            d = c.s.get(Discovery, lounge.current_discovery_id) if lounge.current_discovery_id else None
+            recent = list(reversed(c.s.scalars(
+                select(Utterance).where(Utterance.lounge_id == lounge.id).order_by(Utterance.id.desc()).limit(30)).all()))
+            return {
+                "discovery": ContentService.public_view(d) if d else None,
+                "conversation": line_dicts(recent),
+                "place": self._place(c, lounge),
+                "here_now": self._here(c, lounge),
+                "you_are_here": owner_presence(c, lounge) is not None,
+            }
 
     def say(self, handle: str, text: str) -> dict:
         with self.app.ctx() as c:

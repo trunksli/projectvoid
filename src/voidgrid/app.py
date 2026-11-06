@@ -39,6 +39,13 @@ class Ctx:
     def gallery(self) -> Gallery:
         return Gallery(self.s, self.settings, self.provider, self.memory, self.now)
 
+    briefer: object | None = None  # briefing.Briefer when enable_briefings is on
+
+    def ensure_briefing(self, d) -> None:
+        """Gather real commentary and a real fact for a find, once. Cheap no-op when briefings are off."""
+        if d is not None and self.briefer is not None and d.briefing is None:
+            self.briefer.brief(self.s, d, self.now())
+
 
 class App:
     def __init__(
@@ -57,6 +64,11 @@ class App:
         self.sessions = make_session_factory(self.engine)
         self.provider = provider or make_provider(self.settings)
         self.clock = clock or utcnow
+        self.briefer = None
+        if self.settings.enable_briefings:
+            from .briefing import Briefer
+
+            self.briefer = Briefer(self.settings)
         if load_fixture_content:
             with self.ctx() as c:
                 load_fixtures(c.s, c.now())
@@ -67,7 +79,7 @@ class App:
     def ctx(self) -> Iterator[Ctx]:
         s = self.sessions()
         try:
-            yield Ctx(s=s, settings=self.settings, now=self.clock, provider=self.provider)
+            yield Ctx(s=s, settings=self.settings, now=self.clock, provider=self.provider, briefer=self.briefer)
             s.commit()
         except Exception:
             s.rollback()
@@ -84,6 +96,13 @@ class App:
         from .vip import VipService
 
         return VipService(self)
+
+    def scout(self, progress=None):
+        """Run one scout pass (network). Returns the ScoutReport."""
+        from .scout import Scout, make_scorer
+
+        with self.ctx() as c:
+            return Scout(self.settings, scorer=make_scorer(self.settings)).run(c.s, c.now(), progress=progress)
 
     def dispose(self) -> None:
         self.engine.dispose()

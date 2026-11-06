@@ -177,6 +177,44 @@ class ScriptedProvider:
             return f"Oh, {who}, yes! “{said}” — that's exactly how I feel!"
         return None
 
+    # -- beats: a real fact, what people are saying, a joke ----------------
+    def _fact(self, key, f, rng):
+        fact = f["fact_text"].rstrip()
+        lead = rng.choice((
+            "Strictly speaking, here's the bit nobody mentions:",
+            "Right, a real fact for the table:",
+            "I looked this up, because of course I did:",
+        ))
+        to = f"{f['reply_to']}, " if f.get("reply_to") and rng.random() < 0.5 else ""
+        return f"{to}{lead} {fact} That's from Wikipedia's page on {f['fact_about']}."
+
+    def _crowd(self, key, f, rng):
+        quote = f["quote"].rstrip()
+        take = rng.choice((
+            "And honestly? Same!",
+            "I'm not sure I agree, but I love that somebody cares this much!",
+            "That's the most internet thing I've ever read and I adore it.",
+        ))
+        who = f["quote_who"][0].upper() + f["quote_who"][1:]
+        if f.get("thread_title"):
+            return f"Wait, wait — people have been arguing about this! {who}, in a thread about “{f['thread_title']}”, said: “{quote}” {take}"
+        return f"Wait, wait — people are already talking about this! {who} said: “{quote}” {take}"
+
+    JOKES = (
+        "“{title}.” Finally, a story with more {tag} in it than my last relationship.",
+        "I read “{title}” and immediately felt underqualified to be a person.",
+        "Theo's about to explain “{title}” for forty minutes, so I've ordered snacks. And a pillow.",
+        "“{title}” — which is also what I'm calling my memoir, if the lawyers let me.",
+    )
+
+    def _joke(self, key, f, rng):
+        fact = f.get("fact_text")
+        if fact and rng.random() < 0.4:
+            return f"Apparently {_lower_first(_first_sentence(fact, 110))}. Which is still more than I've achieved this week."
+        title = f["topic_title"]
+        short = title if len(title) <= 70 else title[:69].rsplit(" ", 1)[0] + "…"
+        return rng.choice(self.JOKES).format(title=short, tag=f.get("topic_tag") or "drama")
+
     def _promise(self, key, f, rng):
         who = f.get("user_name")
         return f"Noted{', ' + who if who else ''}! I'll keep an eye out for more {f['tag']} finds for you. That's a promise."

@@ -87,6 +87,15 @@ class Discovery(Base):
     label: Mapped[str] = mapped_column(String(20), default="factual")  # factual | hypothetical | fictional
     is_fixture: Mapped[bool] = mapped_column(Boolean, default=False)
     ingested_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # Scout fields (ported from the oneitem "diamond" pipeline). All optional: fixtures leave them empty.
+    creator: Mapped[str | None] = mapped_column(String(200))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+    score: Mapped[float | None] = mapped_column(Float)  # 0-100 diamond score
+    signals: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # score breakdown + buzz (trend) signals
+    # What the peanut gallery can draw on: real commentary and real facts found around the topic.
+    briefing: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    briefed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     rights: Mapped[SourceRights] = relationship()
 
@@ -154,6 +163,7 @@ class Utterance(Base):
     speaker_name: Mapped[str] = mapped_column(String(80))
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # e.g. {"beat": "fact", "source_url": ...}
 
 
 class UserFact(Base):
