@@ -16,6 +16,9 @@ class EventType:
     DISCOVERY_INGESTED = "discovery.ingested"
     DISCOVERY_SHOWN = "discovery.shown"
     DISCOVERY_REACTED = "discovery.reacted"
+    # Forecaster training data: what was offered (slot, exploratory or not, with what probability) and what was chosen
+    LINEUP_SHOWN = "discovery.lineup_shown"
+    DISCOVERY_PLAYED = "discovery.played"
     EXCHANGE = "bot.discussion_started"
     HUMAN_SPOKE = "human.spoke"
     LOUNGE_THEME = "lounge.theme_changed"

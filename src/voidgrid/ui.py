@@ -36,6 +36,16 @@ class ReactIn(BaseModel):
     reaction: str
 
 
+class PlayIn(BaseModel):
+    discovery_id: int
+    slot: int | None = Field(default=None, ge=0, le=20)
+    lineup_id: int | None = None
+
+
+class LineupIn(BaseModel):
+    exclude: list[int] = Field(default_factory=list, max_length=200)
+
+
 class ScoutState:
     def __init__(self):
         self.running = False
@@ -97,6 +107,18 @@ def create_app(app: App | None = None, *, start_scout: bool | None = None) -> Fa
     @web.post("/api/next", dependencies=[Depends(require_json)])
     def next_find() -> dict:
         return run(lounge.next_find)
+
+    @web.post("/api/lineup", dependencies=[Depends(require_json)])
+    def lineup(body: LineupIn) -> dict:
+        return run(lounge.lineup, set(body.exclude))
+
+    @web.post("/api/play", dependencies=[Depends(require_json)])
+    def play(body: PlayIn) -> dict:
+        with gate:
+            try:
+                return lounge.play(handle, body.discovery_id, slot=body.slot, lineup_id=body.lineup_id)
+            except LoungeError as e:
+                raise HTTPException(400, str(e)) from e
 
     @web.post("/api/say", dependencies=[Depends(require_json)])
     def say(body: SayIn) -> dict:

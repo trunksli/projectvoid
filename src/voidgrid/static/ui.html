@@ -67,8 +67,8 @@ main { display: grid; grid-template-columns: 270px minmax(0, 1fr) 390px; gap: 16
 
 /* Discovery */
 .find { overflow-y: auto; }
-.find .hero { width: 100%; aspect-ratio: 16 / 8; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; display: block; background: var(--panel-2); }
-.find .hero.empty { display: grid; place-items: center; font: italic 18px Georgia, serif; color: var(--muted); }
+.find .hero { width: 100%; aspect-ratio: 16 / 6; object-fit: cover; border-radius: var(--radius) var(--radius) 0 0; display: block; background: var(--panel-2); }
+.find .hero.empty { aspect-ratio: auto; height: 96px; display: grid; place-items: center; font: italic 18px Georgia, serif; color: var(--muted); }
 .find .content { padding: 18px 24px 24px; }
 .kicker { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13px; }
 .chip { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; border-radius: 6px; padding: 2px 7px; background: var(--panel-2); color: var(--muted); }
@@ -83,6 +83,40 @@ main { display: grid; grid-template-columns: 270px minmax(0, 1fr) 390px; gap: 16
 .tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tags span { font-size: 12px; color: var(--muted); }
 .tags span::before { content: "#"; }
+
+/* The stage: whatever's playing */
+.stage-media { border-radius: var(--radius) var(--radius) 0 0; overflow: hidden; background: #000; }
+.stage-media iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; }
+.stage-media.audio { background: var(--panel-2); display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; padding: 18px; }
+.stage-media.audio img { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; }
+.stage-media.audio audio { width: 100%; }
+.stage-media.reader { background: var(--panel-2); padding: 26px 32px; max-height: 380px; overflow-y: auto; }
+.reader-text { font: 18px/1.75 Georgia, serif; max-width: 62ch; margin: 0 auto; white-space: pre-wrap; }
+.reader-text.poem { font-size: 19px; line-height: 1.9; width: fit-content; }
+.reader-more { text-align: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+
+/* The lineup: five to choose from */
+.lineup-wrap { padding: 4px 24px 22px; border-top: 1px solid var(--line); }
+.lineup-head { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; }
+.lineup-head h3 { font: 600 12px/1 system-ui, sans-serif; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 0; flex: 1; }
+.lineup-head button { font-size: 12px; padding: 4px 10px; }
+.lineup { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.card { text-align: left; padding: 0; border-radius: 12px; overflow: hidden; background: var(--panel-2); display: flex; flex-direction: column; min-width: 0; transition: transform .15s ease, border-color .15s ease; }
+.card:hover:not(:disabled), .card:focus-visible { transform: translateY(-2px); border-color: var(--accent); }
+.card .thumb { aspect-ratio: 16 / 10; width: 100%; object-fit: cover; display: block; background: var(--line); }
+.card .quote { aspect-ratio: 16 / 10; padding: 10px 11px; font: italic 12.5px/1.45 Georgia, serif; color: var(--ink); overflow: hidden;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 16%, var(--panel-2)), var(--panel-2)); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+.card .meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.card .row { display: flex; gap: 6px; align-items: center; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+.card .row .k { color: var(--accent); font-weight: 600; }
+.card .row .wild { margin-left: auto; text-transform: none; letter-spacing: 0; border: 1px dashed var(--muted); border-radius: 5px; padding: 0 4px; }
+.card .t { font: 600 13.5px/1.3 Georgia, serif; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .taste { font-size: 12px; line-height: 1.4; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card:hover .taste, .card:focus-visible .taste { -webkit-line-clamp: 5; }
+.card .media-wrap { position: relative; }
+.card .badge { position: absolute; right: 6px; bottom: 6px; background: #000a; color: #fff; font-size: 10.5px; border-radius: 5px; padding: 1px 5px; }
+.card .play { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transition: opacity .15s; background: #0004; color: #fff; font-size: 26px; }
+.card:hover .play, .card:focus-visible .play { opacity: 1; }
 
 /* Gallery */
 .gallery { display: flex; flex-direction: column; }
@@ -116,7 +150,12 @@ form.say input:focus { outline: none; border-color: var(--accent); }
   main { grid-template-columns: 1fr 360px; height: auto; }
   .forecast { grid-column: 1 / -1; order: 3; }
 }
+@media (max-width: 1400px) { .lineup { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 @media (max-width: 760px) {
+  .lineup { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+  .card { flex: 0 0 62%; scroll-snap-align: start; }
+  .lineup-wrap { padding: 4px 16px 18px; }
+  .stage-media.reader { padding: 18px; }
   header { padding: 10px 16px; }
   main { grid-template-columns: 1fr; padding: 12px 16px; }
   .gallery { height: 75vh; }
@@ -141,7 +180,13 @@ form.say input:focus { outline: none; border-color: var(--accent); }
     <div class="body" id="forecast"></div>
   </section>
 
-  <section class="panel find" aria-label="Tonight's find" id="find"></section>
+  <section class="panel find" aria-label="What's on">
+    <div id="find"></div>
+    <div class="lineup-wrap">
+      <div class="lineup-head"><h3>Pick what's next</h3><button id="shuffle-btn" title="Five different options">Show me five others</button></div>
+      <div class="lineup" id="lineup" aria-label="Five options"></div>
+    </div>
+  </section>
 
   <section class="panel gallery" aria-label="Peanut gallery">
     <h2>Peanut gallery</h2>
@@ -206,19 +251,15 @@ function renderFind(d) {
   state.discovery = d;
   const el = $("find");
   if (!d) {
-    el.innerHTML = `<div class="hero empty">A quiet night</div><div class="content"><h2 class="title">Nothing new on the table</h2>
-      <p class="summary">The regulars are just catching up. Try the scout for fresh finds, or keep listening.</p>
-      <div class="actions"><button class="primary" id="next-btn">Try another find</button></div></div>`;
-    $("next-btn").onclick = nextFind;
+    el.innerHTML = `<div class="hero empty">A quiet night</div><div class="content"><h2 class="title">Nothing on right now</h2>
+      <p class="summary">The regulars are just catching up. Pick something below, or keep listening.</p></div>`;
     renderForecast(null);
     return;
   }
-  const img = safeUrl(d.image_url);
   const when = ago(d.published_at);
   const by = d.creator || (d.source && d.source.key) || "";
   el.innerHTML = `
-    ${img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer">`
-          : `<div class="hero empty">${esc(d.kind === "video" ? "A film" : d.kind === "podcast" ? "A podcast episode" : "Tonight's find")}</div>`}
+    ${stageMedia(d)}
     <div class="content">
       <div class="kicker">
         <span class="chip kind">${esc(d.kind)}</span>
@@ -234,16 +275,76 @@ function renderFind(d) {
         <button data-r="liked">Liked it</button>
         <button data-r="meh">Meh</button>
         <span class="spacer"></span>
-        ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer"><button tabindex="-1">Open ↗</button></a>` : ""}
-        <button class="primary" id="next-btn">Next find →</button>
+        ${safeUrl(d.url) ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer"><button tabindex="-1">Open at the source ↗</button></a>` : ""}
       </div>
-      <div class="attrib">${esc(d.source?.attribution || "")} ${d.what_we_accessed ? `· The regulars have only the ${esc(d.what_we_accessed.replace(/_/g, " "))}.` : ""}</div>
+      <div class="attrib">${esc(d.source?.attribution || "")} ${d.what_we_accessed === "excerpt" ? "· The regulars are reading along." : d.what_we_accessed ? `· The regulars have only the ${esc(d.what_we_accessed.replace(/_/g, " "))}.` : ""}</div>
     </div>`;
   const hero = el.querySelector("img.hero");
   if (hero) hero.addEventListener("error", () => { hero.replaceWith(Object.assign(document.createElement("div"), { className: "hero empty", textContent: "Tonight's find" })); });
   el.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => react(b.dataset.r, b)));
-  $("next-btn").onclick = nextFind;
   renderForecast(d);
+}
+
+const KIND_LABEL = { film: "Film", tv: "TV", cartoon: "Cartoon", "short film": "Short film", video: "Short film", podcast: "Podcast", book: "Book", poem: "Poem", article: "Article", fact: "Fact" };
+
+function stageMedia(d) {
+  const p = d.player;
+  const img = safeUrl(d.image_url);
+  if (p && p.type === "iframe" && /^https:\/\/(archive\.org\/embed\/|player\.vimeo\.com\/video\/)/.test(p.src)) {
+    return `<div class="stage-media"><iframe src="${esc(p.src)}" title="${esc(p.label || "Player")}" loading="lazy"
+      allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"></iframe></div>`;
+  }
+  if (p && p.type === "audio" && safeUrl(p.src)) {
+    return `<div class="stage-media audio">${img ? `<img src="${esc(img)}" alt="" referrerpolicy="no-referrer">` : "<span></span>"}
+      <audio controls preload="none" src="${esc(p.src)}"></audio></div>`;
+  }
+  if (p && p.type === "text") {
+    return `<div class="stage-media reader"><div class="reader-text ${p.form === "poem" ? "poem" : ""}">${esc(p.text)}</div>
+      ${p.more_url ? `<div class="reader-more">${link(p.more_url, "Keep reading, free, on Project Gutenberg")} ↗</div>` : ""}</div>`;
+  }
+  return img ? `<img class="hero" src="${esc(img)}" alt="" referrerpolicy="no-referrer">`
+             : `<div class="hero empty">${esc(KIND_LABEL[d.kind] || "Tonight's find")}</div>`;
+}
+
+// ---------------------------------------------------------------- the lineup (five to pick from)
+function cardHtml(o) {
+  const pv = o.preview || {};
+  const img = safeUrl(pv.image);
+  const textual = o.player && o.player.type === "text";
+  const watch = o.player && (o.player.type === "iframe" || o.player.type === "audio");
+  const visual = textual && !img
+    ? `<div class="quote">${esc(pv.teaser)}</div>`
+    : `<div class="media-wrap">${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<div class="quote">${esc(o.title)}</div>`}
+        ${pv.runtime ? `<span class="badge">${esc(pv.runtime)}</span>` : ""}${watch ? `<span class="play" aria-hidden="true">▶</span>` : ""}</div>`;
+  return `<button class="card" data-id="${Number(o.id)}" data-slot="${Number(o.slot)}" title="${esc(o.title)}">
+    ${visual}
+    <div class="meta">
+      <div class="row"><span class="k">${esc(KIND_LABEL[o.kind] || o.kind)}</span>${o.creator ? `<span>${esc(String(o.creator).slice(0, 24))}</span>` : ""}
+        ${o.exploratory ? `<span class="wild" title="A wildcard: picked at random so the regulars learn what you like">wildcard</span>` : ""}</div>
+      <div class="t">${esc(o.title)}</div>
+      <div class="taste">${esc(textual && img ? pv.teaser : (textual ? o.summary : pv.teaser))}</div>
+    </div></button>`;
+}
+function renderLineup(data) {
+  state.lineup = data;
+  const el = $("lineup");
+  const opts = data.options || [];
+  el.innerHTML = opts.length ? opts.map(cardHtml).join("") : `<p class="note">That's everything for now. Try the scout for more.</p>`;
+  el.querySelectorAll("img.thumb").forEach((im) => im.addEventListener("error", () => im.replaceWith(Object.assign(document.createElement("div"), { className: "quote", textContent: im.closest(".card").title }))));
+  el.querySelectorAll(".card").forEach((c) => (c.onclick = () => playPick(Number(c.dataset.id), Number(c.dataset.slot))));
+}
+async function loadLineup(exclude) {
+  try { renderLineup(await api("/api/lineup", { exclude: exclude || [] })); } catch (e) { showErr(e); }
+}
+function playPick(id, slot) {
+  return act(async () => {
+    const r = await api("/api/play", { discovery_id: id, slot, lineup_id: state.lineup?.lineup_id ?? null });
+    renderFind(r.discovery);
+    addLines(r.conversation, r.discovery ? `Now playing: ${r.discovery.title}` : null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    await loadLineup();
+  }, "Putting it on — the regulars are pulling up chairs…");
 }
 
 // ---------------------------------------------------------------- forecast (placeholder)
@@ -333,13 +434,7 @@ async function act(fn, msg) {
   setBusy(true, msg);
   try { await fn(); } catch (e) { showErr(e); } finally { setBusy(false); }
 }
-function nextFind() {
-  return act(async () => {
-    const r = await api("/api/next", {});
-    if (r.discovery) { renderFind(r.discovery); addLines(r.conversation, r.discovery.title); }
-    else { addLines([], r.narration_note || "That's everything for now"); renderFind(null); }
-  }, "Finding something new and looking it up…");
-}
+$("shuffle-btn").onclick = () => loadLineup((state.lineup?.options || []).map((o) => o.id));
 function react(reaction, btn) {
   return act(async () => {
     const r = await api("/api/react", { reaction });
@@ -366,6 +461,8 @@ async function pollScout(force) {
     $("scout-status").textContent = s.message;
     $("scout-status").classList.toggle("live", s.running);
     $("scout-btn").disabled = s.running;
+    if (state.scoutRunning && !s.running) loadLineup();  // fresh finds just landed
+    state.scoutRunning = s.running;
     if (s.running || force) setTimeout(() => pollScout(false), 1500);
   } catch (e) { /* ignore */ }
 }
@@ -386,15 +483,16 @@ $("scout-btn").onclick = async () => {
     if (cur.you_are_here && cur.discovery) {
       renderFind(cur.discovery);
       addLines(cur.conversation);
-      return;
+    } else {
+      await act(async () => {
+        const r = await api("/api/enter", {});
+        applyPlace(r.place);
+        renderFind(r.discovery);
+        addCatchup(r.catch_up);
+        addLines(r.conversation);
+      }, "Walking in…");
     }
-    await act(async () => {
-      const r = await api("/api/enter", {});
-      applyPlace(r.place);
-      renderFind(r.discovery);
-      addCatchup(r.catch_up);
-      addLines(r.conversation);
-    }, "Walking in…");
+    await loadLineup();
   } catch (e) { showErr(e); }
 })();
 </script>

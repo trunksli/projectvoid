@@ -304,11 +304,40 @@ class LoungeService:
 
     def next_find(self, handle: str) -> dict:
         """Put a different find on the table; the regulars react to it (no greeting, you're already here)."""
+        return self.play(handle, None)
+
+    def lineup(self, handle: str, exclude: set[int] | None = None, n: int = 5) -> dict:
+        """Five options to choose from, each with a mini preview. Logged (slot, exploratory, odds) for the forecaster."""
+        with self.app.ctx() as c:
+            user, lounge = self._start(c, handle)
+            now = c.now()
+            ex = set(exclude or ()) | ({lounge.current_discovery_id} if lounge.current_discovery_id else set())
+            opts = c.content.lineup(user, n, seed=_seed(user.id, "lineup", now.isoformat(), sorted(ex)), exclude=ex,
+                                    last_kind=self._last_kind(c, lounge))
+            ev = emit(c.s, EventType.LINEUP_SHOWN, actor_type="system", actor_id="curator", lounge_id=lounge.id, at=now, payload={
+                "options": [{"discovery_id": o["discovery"].id, "slot": i, "kind": o["discovery"].kind, "rank_score": o["score"],
+                             "exploratory": o["exploratory"], "propensity": o["propensity"]} for i, o in enumerate(opts)],
+            })
+            return {
+                "lineup_id": ev.id if ev else None,
+                "options": [dict(ContentService.public_view(o["discovery"]), slot=i, exploratory=o["exploratory"]) for i, o in enumerate(opts)],
+            }
+
+    def play(self, handle: str, discovery_id: int | None, *, slot: int | None = None, lineup_id: int | None = None) -> dict:
+        """Put a find on (the one you picked, or the best next one); the regulars react to what's playing."""
         with self.app.ctx() as c:
             user, lounge = self._start(c, handle)
             self._require_present(c, user, lounge)
             now = c.now()
-            d, promise_tag = c.content.pick_fresh(user, seed=_seed(user.id, "next", now.isoformat()), last_kind=self._last_kind(c, lounge))
+            promise_tag = None
+            if discovery_id is None:
+                d, promise_tag = c.content.pick_fresh(user, seed=_seed(user.id, "next", now.isoformat()), last_kind=self._last_kind(c, lounge))
+            else:
+                d = c.s.get(Discovery, discovery_id)
+                if d is None or not (d.rights.read_metadata and d.rights.link):
+                    raise LoungeError("That one isn't available.")
+                tags = set(d.tags or [])
+                promise_tag = next((p.content for p in c.memory.open_promises(user) if p.content in tags), None)
             if d is None:
                 lounge.current_discovery_id = None
                 return self._result(c, user, lounge, [], extra={"narration_note": "That's everything for now. The scout will turn up more."})
@@ -323,6 +352,9 @@ class LoungeService:
             c.ensure_briefing(d)
             lounge.current_discovery_id = d.id
             emit(c.s, EventType.DISCOVERY_SHOWN, actor_type="system", actor_id="curator", lounge_id=lounge.id, payload={"discovery_id": d.id}, at=now)
+            if discovery_id is not None:
+                emit(c.s, EventType.DISCOVERY_PLAYED, actor_type="human_owner", actor_id=user.handle, lounge_id=lounge.id, at=now,
+                     payload={"discovery_id": d.id, "slot": slot, "lineup_id": lineup_id, "kind": d.kind})
             plan = self._plan(c, user, lounge, "next", d, promise_tag=promise_tag if promise_agent else None, promise_agent=promise_agent,
                               max_commentator_turns=self._commentator_turns(lounge))
             lines = c.gallery.run(plan)

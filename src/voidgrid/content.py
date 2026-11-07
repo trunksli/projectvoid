@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from .config import Settings
 from .events import EventType, emit
+from .media import player, teaser
 from .memory import MemoryService, tags_for_text
 from .models import Discovery, SeenDiscovery, SourceRights, User
 
@@ -24,7 +25,7 @@ log = logging.getLogger(__name__)
 # The lounge is a cozy place: skip items about death, violence and disaster from general feeds.
 # A keyword list is a blunt first pass, not a content classifier (see README, known limitations).
 GRIM = re.compile(
-    r"\b(kill(ed|ing|s)?|dies|died|death|dead|murder\w*|assassinat\w*|massacre\w*|genocide|terror\w*|bomb\w*|"
+    r"\b(kill\w*|dies|died|death|dead|murder\w*|assassinat\w*|massacre\w*|genocide|terror\w*|bomb\w*|"
     r"shoot\w*|crash(ed|es)?|war|wars|attack\w*|execut(ed|ion)|suicide|disaster|famine|earthquake|tsunami|abuse\w*|"
     r"holocaust|concentration camps?|torture\w*|slaughter\w*|atrocit\w*)\b",
     re.I,
@@ -184,6 +185,9 @@ def refresh_wikipedia(session: Session, settings: Settings, now: datetime) -> in
 # ---------------------------------------------------------------------------
 
 
+LINK_KINDS = {"article", "fact"}  # read elsewhere; everything else plays right here
+
+
 class ContentService:
     def __init__(self, session: Session, memory: MemoryService, now: Callable[[], datetime]):
         self.s = session
@@ -191,7 +195,45 @@ class ContentService:
         self.now = now
 
     def pick_fresh(self, user: User, seed: int = 0, *, last_kind: str | None = None) -> tuple[Discovery | None, str | None]:
-        """Return (discovery, fulfilled_promise_tag). Never repeats a discovery for the same person.
+        """Return (discovery, fulfilled_promise_tag). Never repeats a discovery for the same person."""
+        ranked = self.ranked(user, seed, last_kind=last_kind)
+        if not ranked:
+            return None, None
+        _score, hit, best = ranked[0]
+        return best, hit
+
+    def lineup(self, user: User, n: int = 5, seed: int = 0, *, exclude: set[int] = frozenset(),
+               last_kind: str | None = None) -> list[dict]:
+        """Five options to choose from: the best of each kind first, so it's a real choice, plus one exploratory slot.
+
+        The exploratory slot is drawn uniformly from everything else and its probability is recorded, so a later
+        forecaster can learn what you enjoy without only ever learning from its own picks.
+        """
+        ranked = [r for r in self.ranked(user, seed, last_kind=last_kind) if r[2].id not in exclude]
+        picks: list[tuple] = []
+        kinds: set[str] = set()
+        main = n - 1 if len(ranked) >= n else len(ranked)  # keep one slot for exploring when there's enough
+        for media_first in (True, False):  # one per kind, best first: things to watch/read/hear before web articles
+            for r in ranked:
+                if len(picks) >= main:
+                    break
+                if r[2].kind not in kinds and (not media_first or r[2].kind not in LINK_KINDS):
+                    picks.append(r)
+                    kinds.add(r[2].kind)
+        for r in ranked:  # then the best of the rest
+            if len(picks) >= main:
+                break
+            if r not in picks:
+                picks.append(r)
+        out = [{"discovery": d, "score": round(sc, 3), "exploratory": False, "propensity": None} for sc, _h, d in picks]
+        rest = [r for r in ranked if r not in picks]
+        if rest and len(out) < n:
+            sc, _h, d = random.Random(seed ^ 0x5EED).choice(rest)
+            out.append({"discovery": d, "score": round(sc, 3), "exploratory": True, "propensity": round(1 / len(rest), 5)})
+        return out
+
+    def ranked(self, user: User, seed: int = 0, *, last_kind: str | None = None) -> list[tuple[float, str | None, Discovery]]:
+        """Everything this person hasn't seen, best first.
 
         Taste and promises first; then the scout's diamond score, freshness, and oneitem's medium rotation
         (after an article, a near-equal film or podcast wins).
@@ -202,10 +244,11 @@ class ContentService:
                 select(Discovery)
                 .join(SourceRights, SourceRights.source_key == Discovery.source_key)
                 .where(SourceRights.read_metadata.is_(True), SourceRights.link.is_(True), Discovery.id.not_in(seen))
+                .order_by(Discovery.id)
             )
         )
         if not candidates:
-            return None, None
+            return []
         likes, dislikes = self.memory.taste_tags(user)
         promises = {p.content: p for p in self.memory.open_promises(user)}
         rng = random.Random(seed)
@@ -228,9 +271,9 @@ class ContentService:
                 sc -= 0.4  # medium rotation, among near-ties only
             return sc, hit
 
-        scored = [(score(d), d) for d in candidates]
-        (best_score, promise_tag), best = max(scored, key=lambda x: x[0][0])
-        return best, promise_tag
+        scored = [(*score(d), d) for d in candidates]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored
 
     def mark_seen(self, user: User, d: Discovery) -> None:
         if self.s.get(SeenDiscovery, (user.id, d.id)) is None:
@@ -257,4 +300,10 @@ class ContentService:
             "score": d.score,
             "signals": d.signals or {},
             "briefing": {k: (d.briefing or {}).get(k, []) for k in ("commentary", "facts")} if d.briefing is not None else None,
+            "player": player(d.media) if r.embed_or_play else None,  # default deny: no play right, link only
+            "preview": {
+                "image": d.image_url,
+                "teaser": teaser(d.kind, d.summary, d.media),
+                "runtime": (d.media or {}).get("runtime"),
+            },
         }

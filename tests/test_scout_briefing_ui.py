@@ -77,7 +77,8 @@ def test_scout_run_ingests_scores_and_filters(app):
         "https://broken.example/feed": httpx.Response(500),
         "https://hn.algolia.com/api/v1/search": _hn_search,
     }))
-    scout = Scout(app.settings, client=client, feeds=[("https://odd.example/feed", "article"), ("https://broken.example/feed", "article")])
+    scout = Scout(app.settings, client=client, sources=[],
+                  feeds=[("https://odd.example/feed", "article"), ("https://broken.example/feed", "article")])
     with app.ctx() as c:
         rep = scout.run(c.s, NOW)
         assert rep.feeds_ok == 1 and rep.feeds_failed == 1

@@ -82,6 +82,7 @@ class Gallery:
         d = plan.discovery
         if d is not None:
             accessed = {
+                "excerpt": "you have the excerpt itself, shown below, and nothing beyond it",
                 "metadata_only": "you have only its title/description, not the content itself",
                 "transcript": "you have read its transcript",
                 "full_video": "you have analysed the full video",
@@ -89,7 +90,10 @@ class Gallery:
             disc = (
                 f"Current discovery ({d.label}): “{d.title}” — {d.summary}\n"
                 f"Source: {d.canonical_url} ({d.rights.license}). What you actually have: {accessed}."
+                f"\nThe person is {'watching' if d.kind in ('film', 'tv', 'cartoon', 'short film', 'video') else 'listening to' if d.kind == 'podcast' else 'reading'} it right now, so react to it as something on in the room."
             )
+            if d.analysis_depth == "excerpt" and (d.media or {}).get("text"):
+                disc += f"\n<excerpt>\n{str(d.media['text'])[:2500]}\n</excerpt>"
         else:
             disc = "There is no new discovery tonight. Do not invent one."
         disc += self._briefing_block(d)

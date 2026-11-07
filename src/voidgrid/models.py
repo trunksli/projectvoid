@@ -96,6 +96,7 @@ class Discovery(Base):
     # What the peanut gallery can draw on: real commentary and real facts found around the topic.
     briefing: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     briefed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    media: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # how to play it (media.py); None = read via link
 
     rights: Mapped[SourceRights] = relationship()
 

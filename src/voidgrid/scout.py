@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from .config import Settings
 from .content import GRIM, ingest, upsert_rights
+from .media import media_for_link
 from .models import Discovery
 
 log = logging.getLogger(__name__)
@@ -161,6 +162,10 @@ class FeedItem:
     image_url: str | None = None
     feed_url: str = ""
     signals: dict = field(default_factory=dict)
+    media: dict | None = None  # what the UI can play: see media.py
+    reach: int | None = None  # views/downloads where the source reports them (oneitem's rarity input)
+    depth: str = "metadata_only"  # what the regulars actually have: metadata_only | excerpt
+    rights: dict | None = None  # sources other than feeds bring their own rights record
 
 
 def parse_feed(xml_text: str, kind: str, feed_url: str = "") -> list[FeedItem]:
@@ -177,11 +182,14 @@ def parse_feed(xml_text: str, kind: str, feed_url: str = "") -> list[FeedItem]:
             title = plain(_text(it, "title"))
             if not (url and title):
                 continue
+            enc = it.find("enclosure")
+            audio = safe_url(enc.get("url")) if enc is not None and (enc.get("type") or "").startswith("audio/") else None
             items.append(FeedItem(
                 title=title, url=url, summary=first_sentences(plain(desc) or plain(html)), kind=kind,
                 creator=plain(_text(it, f"{ITUNES}author", "{http://purl.org/dc/elements/1.1/}creator")) or feed_title,
                 published_at=_date(_text(it, "pubDate", "{http://purl.org/dc/elements/1.1/}date")),
-                image_url=_image(it, desc + html), feed_url=feed_url,
+                image_url=_image(it, desc + html) or _image(channel, ""), feed_url=feed_url,
+                media=media_for_link(url, audio),
             ))
     else:  # Atom
         feed_title = _text(root, f"{ATOM}title") or urlparse(feed_url).netloc
@@ -319,6 +327,16 @@ def rarity_from_points(points: int | None) -> int:
     return 5
 
 
+def rarity_from_views(views: int | None) -> int:
+    """oneitem's thresholds on view (or download) counts."""
+    if views is None:
+        return 60
+    for limit, r in ((5_000, 100), (50_000, 85), (500_000, 60), (2_000_000, 30)):
+        if views < limit:
+            return r
+    return 5
+
+
 def outlier_bonus(signals: dict, published_at: datetime | None, now: datetime) -> int:
     """oneitem's 'viral outlier' bonus: up to 30 points for an item catching fire in its first 14 days."""
     pph = signals.get("hn_points_per_hour")
@@ -334,7 +352,7 @@ def outlier_bonus(signals: dict, published_at: datetime | None, now: datetime) -
 
 
 def diamond(j: dict, signals: dict, published_at: datetime | None, now: datetime) -> tuple[float, dict]:
-    rarity = rarity_from_points(signals.get("hn_points"))
+    rarity = rarity_from_points(signals["hn_points"]) if signals.get("hn_points") is not None else rarity_from_views(signals.get("reach"))
     bonus = outlier_bonus(signals, published_at, now)
     base = 0.45 * j["quality"] + 0.25 * j["interestingness"] + 0.20 * rarity + 0.10 * j["originality"]
     penalty = 0.5 * j["clickbait"]
@@ -353,7 +371,9 @@ def _rights_for(feed_url: str, creator: str) -> dict:
     return {
         "source_key": f"feed:{host}",
         "rights_holder": creator or host,
-        "license": "© the publisher. Linked; title and the feed's own short summary only.",
+        "license": "© the publisher. Linked; title and the feed's own short summary only. Films and episodes play "
+                   "in the publisher's own player or from their own audio host.",
+        "embed_or_play": True,  # media.player() only ever builds official embeds (Vimeo) or the feed's own audio
         "attribution": f"From {creator or host}. Follow the link for the original.",
         "verification_status": "public_feed_link_only",
         "link": True,
@@ -375,7 +395,7 @@ class ScoutReport:
 
 class Scout:
     def __init__(self, settings: Settings, *, client: httpx.Client | None = None, scorer: Scorer | None = None,
-                 feeds: list[tuple[str, str]] | None = None):
+                 feeds: list[tuple[str, str]] | None = None, sources: list | None = None):
         self.settings = settings
         self.client = client or httpx.Client(
             timeout=10.0, follow_redirects=True,
@@ -384,15 +404,23 @@ class Scout:
         self.heuristic = HeuristicScorer()
         self.scorer = scorer
         self.feeds = feeds if feeds is not None else FEEDS
+        if sources is None:
+            from .media import MEDIA_SOURCES
 
-    def _fetch(self, feed: tuple[str, str]) -> tuple[str, list[FeedItem] | Exception]:
-        url, kind = feed
+            sources = MEDIA_SOURCES
+        self.sources = sources  # callables (client, now) -> list[FeedItem]: films, TV, books, poems
+
+    def _fetch(self, feed) -> tuple[str, list[FeedItem] | Exception]:
+        label = getattr(feed, "label", getattr(feed, "__name__", "source")) if callable(feed) else feed[0]
         try:
+            if callable(feed):
+                return label, feed(self.client, self._now)
+            url, kind = feed
             resp = self.client.get(url)
             resp.raise_for_status()
             return url, parse_feed(resp.text, kind, url)
-        except Exception as e:  # one broken feed must never stop the run
-            return url, e
+        except Exception as e:  # one broken source must never stop the run
+            return label, e
 
     def _buzz(self, item: FeedItem, now: datetime) -> None:
         try:
@@ -404,16 +432,18 @@ class Scout:
     def run(self, session: Session, now: datetime, *, progress: Callable[[str], None] | None = None) -> ScoutReport:
         rep = ScoutReport()
         say = progress or (lambda _m: None)
-        say("Reading feeds")
+        say("Reading feeds, films, books and poems")
+        self._now = now
         with ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(self._fetch, self.feeds))
+            results = list(pool.map(self._fetch, [*self.feeds, *self.sources]))
 
         known = set(session.scalars(select(Discovery.canonical_url)))
         fresh: list[FeedItem] = []
         for url, res in results:
             if isinstance(res, Exception):
                 rep.feeds_failed += 1
-                rep.errors.append(f"{urlparse(url).netloc}: {type(res).__name__}")
+                rep.errors.append(f"{urlparse(url).netloc or url}: {type(res).__name__}")
+                log.warning("source failed: %s: %s", url, res)
                 continue
             rep.feeds_ok += 1
             taken = 0
@@ -432,26 +462,29 @@ class Scout:
         say(f"Checking buzz for {len(fresh)} new finds")
         with ThreadPoolExecutor(max_workers=8) as pool:
             list(pool.map(lambda it: self._buzz(it, now), fresh))
+        for it in fresh:
+            it.signals["reach"] = it.reach
 
         say("Scoring")
-        by_feed: dict[str, list[dict]] = {}
+        by_source: dict[str, tuple[dict, list[dict]]] = {}
         for it in fresh:
             j = (self.scorer.judge(it) if self.scorer else None) or self.heuristic.judge(it)
             score, breakdown = diamond(j, it.signals, it.published_at, now)
             if score <= 0:
                 rep.rejected += 1
                 continue
-            by_feed.setdefault(it.feed_url, []).append({
+            rights = it.rights or _rights_for(it.feed_url, it.creator)
+            by_source.setdefault(rights["source_key"], (rights, []))[1].append({
                 "external_id": it.url[:200],
                 "title": it.title,
                 "summary": it.summary or it.title,
                 "canonical_url": it.url,
                 "kind": it.kind,
+                "analysis_depth": it.depth,
                 "_extra": {"creator": it.creator[:200], "image_url": it.image_url, "published_at": it.published_at,
-                           "score": score, "signals": dict(it.signals, **{"breakdown": breakdown})},
+                           "score": score, "signals": dict(it.signals, **{"breakdown": breakdown}), "media": it.media},
             })
-        for feed_url, items in by_feed.items():
-            rights = _rights_for(feed_url, items[0]["_extra"]["creator"])
+        for rights, items in by_source.values():
             upsert_rights(session, rights)
             extras = {i["external_id"]: i.pop("_extra") for i in items}
             rep.added += ingest(session, rights["source_key"], items, now)

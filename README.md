@@ -31,7 +31,30 @@ uv run --group dev pytest
 uv run voidgrid-ui     # http://127.0.0.1:8010
 ```
 
-Three panels: the **find** in the middle, a **forecast** on the left (a placeholder for now, showing current buzz and the scout's score breakdown), and the **peanut gallery** on the right, where you can talk to the room. On first start the scout reads its feeds in the background (about 30 seconds); press **Next find** to see what it found.
+Three panels:
+
+- **Middle:** what's on, playing right there (a film, a TV episode, a podcast, a book excerpt, a poem), with **five options** underneath. Each option has a mini preview: a thumbnail, its runtime, the opening line, or the first lines of the poem. Click one to put it on; the regulars react to that one. **Show me five others** gives five different options.
+- **Left:** a **forecast** (a placeholder for now, showing current buzz and the scout's score breakdown).
+- **Right:** the **peanut gallery**, where you can talk to the room.
+
+On first start the scout reads everything in the background (about 30 seconds) and the lineup refreshes when it's done.
+
+### What can play here
+
+Only things that are publicly available *and* allowed to be shown, played with each source's own player:
+
+| What | From | How it plays |
+|---|---|---|
+| Films, classic TV, cartoons | Internet Archive: items the uploader marked public domain, from 1977 or earlier (a 2011 film marked "public domain" is not) | Archive's embed player |
+| Short films | Prelinger Archives (public-domain collection); Vimeo Staff Picks | Archive / Vimeo do-not-track player |
+| Books | Project Gutenberg (via Gutendex), public domain in the US | The opening of the story, then a link to read the rest free |
+| Poems | PoetryDB (public-domain poetry) | The whole poem (short ones only) |
+| Podcasts | The scout's podcast feeds | The publisher's own audio file |
+| Articles | The scout's feeds | Summary and a link (we never copy the article) |
+
+Embed URLs are rebuilt on the server from validated ids ([media.py](src/voidgrid/media.py)); the browser never gets a raw third-party URL for an iframe. When something is a book or a poem, the regulars get the actual text, so they react to the words, not just the title.
+
+The lineup puts things you can watch, read or hear first, one of each kind, ahead of web articles. The fifth slot is a **wildcard**, picked at random and labelled as one. Every lineup (what was offered, in which slot, which one was the wildcard, and the odds of it being picked) and every pick is logged as an event. That's the training data a real forecaster needs to learn what you enjoy without only learning from its own choices.
 
 The UI runs the same lounge as the MCP server (same database, same `VOIDGRID_USER_HANDLE`). It's **local only**: there's no login, so it binds to 127.0.0.1, rejects other Host headers, and only accepts JSON posts. Don't expose it; `voidgrid-web` is the one meant for the internet.
 
@@ -130,12 +153,15 @@ VOIDGRID_DATABASE_URL=postgresql+psycopg://voidgrid:voidgrid@localhost:5432/void
 | `src/voidgrid/ui.py`, `static/ui.html` | The owner's web UI |
 | `src/voidgrid/scout.py` | Feeds, buzz, diamond score (oneitem port) |
 | `src/voidgrid/briefing.py` | Real commentary and facts for the gallery |
+| `src/voidgrid/media.py` | Films, TV, books, poems: sources and safe players |
 | `migrations/` | Alembic migrations |
 
 ## Known limitations (v1)
 
 - **Not yet tried with real Claude voices.** The Claude provider's request shape is tested against the SDK, but no live conversation has been run. Voice quality and per-visit cost are unmeasured.
 - **Scripted mode is a placeholder voice.** It's fine for tests and offline use, but repetitive over many visits.
+- **No YouTube.** Its channel feeds returned 404 for most channels (checked 2026-11-06), and its API needs a key. So no current movie or TV clips yet, only public-domain ones.
+- **Public-domain marks on the Internet Archive are uploaders' claims.** The 1977 cut-off removes the obvious false ones, but it isn't a legal review.
 - **Commentary coverage is thin.** Most fresh niche articles haven't been posted to Hacker News yet, so Pip's beat is often skipped. Bluesky and Reddit search both refuse unauthenticated requests (checked 2026-11-06); adding them needs app credentials.
 - **Fact matching is word overlap**, unless Claude is on (then Claude suggests the Wikipedia articles). Offline it can land on a related-but-tangential page (a fact about Berkeley for a story set there).
 - **Offline scoring is a heuristic.** Without Claude, the diamond score mostly reflects buzz and freshness, not quality.

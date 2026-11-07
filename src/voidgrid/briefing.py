@@ -41,6 +41,7 @@ other another such more most much many few over under out up down off into onto 
 very really quite way back began begin become became becomes get got make made making take took playing play played
 one two new old first last own same can could would should will may might must has have had having does did doing
 like across between through during while because until upon within without year years time times day days people
+short poem poems begins book books novel public domain film films internet archive collection episode
 """.split())
 _URLISH = re.compile(r"https?://\S+")
 
@@ -68,6 +69,7 @@ def _words(text: str) -> set[str]:
 
 
 MIN_SHARED_WORDS = 2
+AUTHORED_KINDS = {"book", "poem"}
 
 
 def context_words(d: Discovery) -> set[str]:
@@ -226,10 +228,30 @@ class Briefer:
                     return quote(hit["title"].replace(" ", "_"), safe="_()'")
         return None
 
+    def _author_page(self, d: Discovery) -> str | None:
+        """For a book or poem, the author's own page: a fact about Byron always belongs with a Byron poem."""
+        if d.kind not in AUTHORED_KINDS or not d.creator or d.creator.lower() in ("unknown", "anonymous", "various"):
+            return None
+        surname = re.sub(r"\(.*?\)", "", d.creator).split()[-1].lower()  # "George Gordon, Lord Byron" -> "byron"
+        resp = self.client.get(WIKI_SEARCH, params={"action": "query", "list": "search", "srsearch": d.creator, "srlimit": 3, "format": "json"})
+        resp.raise_for_status()
+        for hit in resp.json().get("query", {}).get("search", []):
+            if surname not in hit["title"].lower():
+                continue
+            title = quote(hit["title"].replace(" ", "_"), safe="_()'")
+            page = self.client.get(WIKI_SUMMARY.format(title=title))
+            if page.status_code == 200 and re.search(r"\b(poet|writer|novelist|author|playwright|essayist|dramatist)\b",
+                                                     page.json().get("description") or "", re.I):
+                return title  # the person, not a film or a book about them
+        return None
+
     def fact(self, d: Discovery) -> dict | None:
         host = urlparse(d.canonical_url).netloc
+        trusted = False  # the page is known to be about this find, so skip the word-overlap check
         if host.endswith("wikipedia.org") and "/wiki/" in d.canonical_url:
-            title = d.canonical_url.split("/wiki/", 1)[1]
+            title, trusted = d.canonical_url.split("/wiki/", 1)[1], True
+        elif title := self._author_page(d):
+            trusted = True  # verified to be the author (a writer/poet page), not a namesake
         else:
             title = self._find_page(d)
             if title is None:
@@ -239,7 +261,7 @@ class Briefer:
         page = resp.json()
         if page.get("type") == "disambiguation":
             return None
-        if not host.endswith("wikipedia.org") and len(_words(page.get("extract") or "") & context_words(d)) < MIN_SHARED_WORDS:
+        if not trusted and len(_words(page.get("extract") or "") & context_words(d)) < MIN_SHARED_WORDS:
             return None  # not about this find after all
         sentence = pick_fact(page.get("extract") or "", f"{d.title} {d.summary}")
         if not sentence:
